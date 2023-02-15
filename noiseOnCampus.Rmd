@@ -1,0 +1,99 @@
+---
+title: "Title"
+author: "Christian Oppegård Moen"
+date: "DD MM YYYY"
+output: 
+  bookdown::pdf_document2:
+    toc_depth: '3' # Depth of contents
+    number_sections: false
+  # pdf_document:
+  # #   toc: no
+  #   toc_depth: '3'
+subtitle: Course
+urlcolor: blue
+editor_options: 
+  chunk_output_type: console
+header-includes:
+- \usepackage[width=0.8\textwidth]{caption} # add caption to figures.
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  echo = T, tidy=T, message=F, warning=F,
+  strip.white=F, # Strips whitespace
+  prompt=F, #?
+  cache=T, # Cache for quick knit.
+  # root.dir = "./subfolder",
+  size="scriptsize",
+  fig.width=7, 
+  fig.height=5, 
+  fig.align = "center"
+)
+```
+
+
+
+```{r config, include=F}
+if (F){
+  setwd("C:/Users/kikka/OneDrive - NTNU/Fysmat/8 Semester V2022/RomStat/romstat/project3")
+  options(error=recover)
+  options(error=NULL)
+}
+```
+
+# Data
+Dataformat is of tab separated values regarding noise on campus. Some variables are shown in the printout below. The response is `spm3` and `spm4` which are "trivsel" and "effektivitet", respectively. The response is evaluated for each building block.
+## Load data
+```{r load, options}
+# d = read.delim("C:/Users/kikka/OneDrive - NTNU/Fysmat/10 Semester V2023/EiT/TTT4850/data/data-315297-2023-02-09-1558-utf.txt", header=T)
+d = read.delim("./data/data-315297-2023-02-15-1118-utf.txt", header=T)
+head(d[1:5])
+```
+
+## Reformat dumb shit
+```{r reformatTime, options}
+d = read.delim("./data/data-315297-2023-02-15-1118-utf.txt", header=T)
+
+# Time
+formatTime <- function(t) {
+  tSplit = strsplit(t, ' ')[[1]]
+  s=0
+  for (i in seq(1, length(tSplit), 2)){
+    s = s + switch(
+      tSplit[i+1],
+      "dager" = strtoi(tSplit[i])*24*3600,
+      "dag" = strtoi(tSplit[i])*24*3600,
+      "timer" = strtoi(tSplit[i])*3600,
+      "time" = strtoi(tSplit[i])*3600,
+      "minutt" = strtoi(tSplit[i])*60,
+      "minutter" = strtoi(tSplit[i])*60,
+      "sekunder" = strtoi(tSplit[i]),
+      "sekund" = strtoi(tSplit[i]),
+      0
+    )
+  }
+  return(s)
+}
+
+# new.function <- function(a) {
+#    for(i in 1:a) {
+#       b <- i^2
+#       print(b)
+#    }
+# }
+
+# times = d$Svartid
+# times
+
+ftimes = unlist(lapply(d$Svartid, formatTime))
+cbind(d$Svartid, ftimes)
+d$Svartid=ftimes
+
+# Free text answers
+
+```
+
+```{r freeTextToFile, options}
+write.csv(d[d[,'spm6']!="",c('NR','spm6')],"./data/freeTxt.csv", row.names = FALSE)
+```
