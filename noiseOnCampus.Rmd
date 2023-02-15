@@ -76,16 +76,6 @@ formatTime <- function(t) {
   return(s)
 }
 
-# new.function <- function(a) {
-#    for(i in 1:a) {
-#       b <- i^2
-#       print(b)
-#    }
-# }
-
-# times = d$Svartid
-# times
-
 ftimes = unlist(lapply(d$Svartid, formatTime))
 cbind(d$Svartid, ftimes)
 d$Svartid=ftimes
@@ -97,3 +87,6 @@ d$Svartid=ftimes
 ```{r freeTextToFile, options}
 write.csv(d[d[,'spm6']!="",c('NR','spm6')],"./data/freeTxt.csv", row.names = FALSE)
 ```
+
+## Make response
+As mentioned, the responses are `spm3` and `spm4`. 
