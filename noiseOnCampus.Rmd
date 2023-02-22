@@ -47,13 +47,13 @@ Dataformat is of tab separated values regarding noise on campus. Some variables 
 ## Load data
 ```{r load, options}
 # d = read.delim("C:/Users/kikka/OneDrive - NTNU/Fysmat/10 Semester V2023/EiT/TTT4850/data/data-315297-2023-02-09-1558-utf.txt", header=T)
-d = read.delim("./data/data-315297-2023-02-15-1118-utf.txt", header=T)
-head(d[1:5])
+# d = read.delim("./data/data-315297-2023-02-15-1118-utf.txt", header=T)
+# head(d[1:5])
 ```
 
 ## Reformat dumb shit
 ```{r reformatTime, options}
-d = read.delim("./data/data-315297-2023-02-15-1118-utf.txt", header=T)
+d = read.delim("./data/data-315297-2023-02-22-0953-utf.txt", header=T)
 
 # Time
 formatTime <- function(t) {
@@ -78,15 +78,90 @@ formatTime <- function(t) {
 
 ftimes = unlist(lapply(d$Svartid, formatTime))
 cbind(d$Svartid, ftimes)
-d$Svartid=ftimes
+# d$Svartid=ftimes
 
 # Free text answers
 
 ```
 
 ```{r freeTextToFile, options}
-write.csv(d[d[,'spm6']!="",c('NR','spm6')],"./data/freeTxt.csv", row.names = FALSE)
+write.csv(d[d[,'spmTekst']!="",c('NR','spmTekst')],"./data/freeTxt.csv", row.names = FALSE)
+
 ```
 
 ## Make response
-As mentioned, the responses are `spm3` and `spm4`. 
+As mentioned, the responses are `spm3` and `spm4`.
+```{r meanPerBuilding, options}
+# head(d)
+# variates = names(d)
+# yt = d$spmTriv
+# ye = d$spmEff
+locs = unique(d$spmHvor)
+locs
+```
+
+
+```{r anc, options}
+N = length(d[,1])
+ancPercentage = length(d$spmTiltak_1[d$spmTiltak_1=='mNc']) / N
+ancPercentage
+```
+
+```{r response, options}
+yBuilding = data.frame(
+  matrix(ncol=length(locs),
+         nrow=2, 
+         dimnames=list(c('trivsel', 'effektivitet'), locs))
+  )
+for (loc in locs){
+  # browser()
+  yBuilding[loc] = c(mean(d$spmTriv[d$spmHvor==loc]),
+             mean(d$spmEff[d$spmHvor==loc]))
+} 
+yBuilding[1:5]
+```
+`` 
+
+```{r barplotSave, include=FALSE, eval=FALSE}
+# æ is \u00E6
+# ø is \u00F8
+# å is \u00E5
+pdf(file = './figures/histTrivsel&Effektivitet.pdf', width = 10,height = 6)
+barplot(
+  ((as.matrix(yBuilding))), 
+  col = c("lightblue", 'darkblue'),
+  border = "white",
+  # main="Trivsel",
+  ylab="P\u00E5virkning",
+  beside = T,
+  las=2,
+  ylim = c(0,5)
+  # space=0.1
+)
+legend(
+  "top",
+  legend = c("Trivsel", "Effektivitet"),
+  fill = c("lightblue", 'darkblue'), bty = 'n')
+dev.off()
+```
+```{r barplotResponses, options}
+# æ is \u00E6
+# ø is \u00F8
+# å is \u00E5
+barplot(
+  ((as.matrix(yBuilding))), 
+  col = c("lightblue", 'darkblue'),
+  border = "white",
+  # main="Trivsel",
+  ylab="P\u00E5virkning",
+  beside = T,
+  las=2,
+  ylim = c(0,5)
+  # space=0.1
+)
+legend(
+  "top",
+  legend = c("Trivsel", "Effektivitet"),
+  fill = c("lightblue", 'darkblue'), bty = 'n')
+```
+
