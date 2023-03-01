@@ -1,0 +1,7 @@
+<osm version="0.6" generator="CGImap 0.8.8 (423218 spike-08.openstreetmap.org)" copyright="OpenStreetMap and contributors" attribution="http://www.openstreetmap.org/copyright" license="http://opendatacommons.org/licenses/odbl/1-0/">
+<node id="4633442181" visible="true" version="3" changeset="129375266" timestamp="2022-11-25T16:16:29Z" user="NKA" uid="3497659" lat="63.4185675" lon="10.4028343">
+<tag k="name" v="Gløshaugen"/>
+<tag k="place" v="neighbourhood"/>
+<tag k="wikidata" v="Q3363298"/>
+</node>
+</osm>
