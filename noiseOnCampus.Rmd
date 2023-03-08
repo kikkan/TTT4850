@@ -32,8 +32,6 @@ knitr::opts_chunk$set(
 )
 ```
 
-
-
 ```{r config, include=F}
 if (F){
   setwd("C:/Users/kikka/OneDrive - NTNU/Fysmat/8 Semester V2022/RomStat/romstat/project3")
@@ -42,21 +40,21 @@ if (F){
 }
 ```
 
+# Libraries
 ```{r librarys, options}
 library(glmm)
 library(dplyr)
 ```
 
 # Data
-Dataformat is of tab separated values regarding noise on campus. Some variables are shown in the printout below. The response is `spm3` and `spm4` which are "trivsel" and "effektivitet", respectively. The response is evaluated for each building block.
+Dataformat is of tab separated values regarding noise on campus. Some variables are shown in the printout below. The response is `spmTriv` and `spmEff` which are "trivsel" and "effektivitet", respectively. The response is evaluated for each building block.
 
-
-## Load and reformat
+## Load data and reformat
 ```{r reformatTime, options}
 pathData = "./data"
-d = read.delim("./data/data-315297-2023-02-22-0953-utf.txt", header=T)
+d = read.delim("./data/data-315297-2023-03-08-1434-utf.txt", header=T)
 
-# Time
+# Reformat the time to be total time in seconds
 formatTime <- function(t) {
   tSplit = strsplit(t, ' ')[[1]]
   s=0
@@ -78,28 +76,24 @@ formatTime <- function(t) {
 }
 
 ftimes = unlist(lapply(d$Svartid, formatTime))
-cbind(d$Svartid, ftimes)
+head(cbind(old=d$Svartid, new=ftimes))
 d$Svartid=ftimes
-
-# Free text answers
-
 ```
 
-```{r freeTextToFile, options}
+```{r freeTextToFile, eval=F}
 write.csv(d[d[,'spmTekst']!="",c('NR','spmTekst')],"./data/freeTxt.csv", row.names = FALSE)
-
 ```
 
-## Make response
-As mentioned, the responses are `spm3` and `spm4`.
-```{r meanPerBuilding, options}
-# head(d)
-# variates = names(d)
-# yt = d$spmTriv
-# ye = d$spmEff
-locs = unique(d$spmHvor)
-locs
-```
+<!-- ## Make response -->
+<!-- As mentioned, the responses are `spm3` and `spm4`. -->
+<!-- ```{r meanPerBuilding, options} -->
+<!-- # head(d) -->
+<!-- # variates = names(d) -->
+<!-- # yt = d$spmTriv -->
+<!-- # ye = d$spmEff -->
+<!-- locs = unique(d$spmHvor) -->
+<!-- locs -->
+<!-- ``` -->
 
 
 ```{r anc, options}
@@ -108,20 +102,26 @@ ancPercentage = length(d$spmTiltak_1[d$spmTiltak_1=='mNc']) / N
 ancPercentage
 ```
 
-## Response (empirical mean and sd)
+## Response (empirical mean and standard deviations (SD))
+Compute per building means and SDs
 ```{r response, options}
+# All locations/buildings
+locs = unique(d$spmHvor)
+
+# initiate per building empirical mean data frame
 buildMeans = data.frame(
   matrix(ncol=length(locs),
          nrow=2, 
          dimnames=list(c('trivsel', 'effektivitet'), locs))
   )
+# initiate per building standard deviation data frame
 buildSd = data.frame(
   matrix(ncol=length(locs),
          nrow=2, 
          dimnames=list(c('trivsel', 'effektivitet'), locs))
   )
+# Compute means and SDs
 for (loc in locs){
-  # browser()
   buildMeans[loc] = c(mean(d$spmTriv[d$spmHvor==loc]),
              mean(d$spmEff[d$spmHvor==loc]))
   buildSd[loc] = c(sd(d$spmTriv[d$spmHvor==loc]),
@@ -129,8 +129,7 @@ for (loc in locs){
 } 
 buildMeans[1:5]
 buildSd[1:5]
-# Write to file
-
+rbind(buildMeans,buildSd)[1:5]
 ```
 
 ```{r writeTo.dat, options}
@@ -200,6 +199,31 @@ legend(
   "top",
   legend = c("Trivsel", "Effektivitet"),
   fill = c("lightblue", 'darkblue'), bty = 'n')
+
+mTriv= max(buildMeans['trivsel',])
+mEff = max(buildMeans['effektivitet',])
+buildMeans['effektivitet',buildMeans['effektivitet',]==mEff]
+buildMeans['trivsel',buildMeans['trivsel',]==mTriv]
+
+# sort(buildMeans['trivsel',], decreasing = T)
+```
+
+```{r barplotResponseSD, options}
+barplot(
+  ((as.matrix(buildSd))), 
+  col = c("lightblue", 'darkblue'),
+  border = "white",
+  # main="Trivsel",
+  ylab="Standardavvik",
+  beside = T,
+  las=2,
+  # ylim = c(0,5)
+  # space=0.1
+)
+legend(
+  "top",
+  legend = c("Trivsel", "Effektivitet"),
+  fill = c("lightblue", 'darkblue'), bty = 'n')
 ```
 
 
@@ -254,9 +278,9 @@ par(d)
 
 # Initial data observations
 ```{r initial, options}
-hist(d$spmTriv, breaks = seq(0.5,5.5,1), freq = F)
+hist(d$spmTriv, breaks = seq(0.5,5.5,1), freq = T)
 lines(density(d$spmTriv, bw=1, from = 1, to = 5))
-hist(d$spmEff, breaks = seq(0.5,5.5,1), freq = F)
+hist(d$spmEff, breaks = seq(0.5,5.5,1), freq = T)
 lines(density(d$spmEff, bw=1, from = 1, to = 5))
 ```
 
@@ -264,7 +288,7 @@ lines(density(d$spmEff, bw=1, from = 1, to = 5))
 # Linear models
 ```{r linMods, options}
 lmTrivSource = lm(
-  spmTriv ~ byggestoy1 + personstoy1 + trafikk1 + vifte1 + annet1,
+  spmTriv ~ -1 + byggestoy1 + personstoy1 + trafikk1 + vifte1 + annet1,
   data=d
 )
 summary(lmTrivSource)
