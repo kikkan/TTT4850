@@ -13,15 +13,13 @@ formatTime <- function(t) {
       "dager" = as.numeric(tSplit[i])*24*3600,
       "dag" = as.numeric(tSplit[i])*24*3600,
       "timer" = as.numeric(tSplit[i])*3600,
+      "time" = as.numeric(tSplit[i])*3600,
       "minutt" = as.numeric(tSplit[i])*60,
       "minutter" = as.numeric(tSplit[i])*60,
       "sekunder" = as.numeric(tSplit[i]),
       "sekund" = as.numeric(tSplit[i]),
       0
     )
-  }
-  if (s<=0){
-    a=0
   }
   return(s)
 }

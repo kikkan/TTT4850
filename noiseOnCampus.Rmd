@@ -42,17 +42,18 @@ if (F){
 }
 ```
 
-# Data
-Dataformat is of tab separated values regarding noise on campus. Some variables are shown in the printout below. The response is `spm3` and `spm4` which are "trivsel" and "effektivitet", respectively. The response is evaluated for each building block.
-## Load data
-```{r load, options}
-# d = read.delim("C:/Users/kikka/OneDrive - NTNU/Fysmat/10 Semester V2023/EiT/TTT4850/data/data-315297-2023-02-09-1558-utf.txt", header=T)
-# d = read.delim("./data/data-315297-2023-02-15-1118-utf.txt", header=T)
-# head(d[1:5])
+```{r librarys, options}
+library(glmm)
+library(dplyr)
 ```
 
-## Reformat dumb shit
+# Data
+Dataformat is of tab separated values regarding noise on campus. Some variables are shown in the printout below. The response is `spm3` and `spm4` which are "trivsel" and "effektivitet", respectively. The response is evaluated for each building block.
+
+
+## Load and reformat
 ```{r reformatTime, options}
+pathData = "./data"
 d = read.delim("./data/data-315297-2023-02-22-0953-utf.txt", header=T)
 
 # Time
@@ -78,7 +79,7 @@ formatTime <- function(t) {
 
 ftimes = unlist(lapply(d$Svartid, formatTime))
 cbind(d$Svartid, ftimes)
-# d$Svartid=ftimes
+d$Svartid=ftimes
 
 # Free text answers
 
@@ -107,20 +108,55 @@ ancPercentage = length(d$spmTiltak_1[d$spmTiltak_1=='mNc']) / N
 ancPercentage
 ```
 
+## Response (empirical mean and sd)
 ```{r response, options}
-yBuilding = data.frame(
+buildMeans = data.frame(
+  matrix(ncol=length(locs),
+         nrow=2, 
+         dimnames=list(c('trivsel', 'effektivitet'), locs))
+  )
+buildSd = data.frame(
   matrix(ncol=length(locs),
          nrow=2, 
          dimnames=list(c('trivsel', 'effektivitet'), locs))
   )
 for (loc in locs){
   # browser()
-  yBuilding[loc] = c(mean(d$spmTriv[d$spmHvor==loc]),
+  buildMeans[loc] = c(mean(d$spmTriv[d$spmHvor==loc]),
              mean(d$spmEff[d$spmHvor==loc]))
+  buildSd[loc] = c(sd(d$spmTriv[d$spmHvor==loc]),
+             sd(d$spmEff[d$spmHvor==loc]))
 } 
-yBuilding[1:5]
+buildMeans[1:5]
+buildSd[1:5]
+# Write to file
+
 ```
-`` 
+
+```{r writeTo.dat, options}
+# means
+write.table(
+  t(buildMeans['trivsel',]), 
+  file= paste(pathData,'/trivselPerBygning.dat',sep = ""), 
+  row.names = T, sep = ',', quote = F
+)
+write.table(
+  t(buildMeans['effektivitet',]), 
+  file= paste(pathData,'/effektivitetPerBygning.dat',sep = ""), 
+  row.names = T, sep = ',', quote = F
+)
+# Standard deviations (sd)
+write.table(
+  t(buildSd['trivsel',]), 
+  file= paste(pathData,'/trivselPerBygningSD.dat',sep = ""), 
+  row.names = T, sep = ',', quote = F
+)
+write.table(
+  t(buildSd['effektivitet',]), 
+  file= paste(pathData,'/effektivitetPerBygningSD.dat',sep = ""), 
+  row.names = T, sep = ',', quote = F
+)
+```
 
 ```{r barplotSave, include=FALSE, eval=FALSE}
 # æ is \u00E6
@@ -128,7 +164,7 @@ yBuilding[1:5]
 # å is \u00E5
 pdf(file = './figures/histTrivsel&Effektivitet.pdf', width = 10,height = 6)
 barplot(
-  ((as.matrix(yBuilding))), 
+  ((as.matrix(buildMeans))), 
   col = c("lightblue", 'darkblue'),
   border = "white",
   # main="Trivsel",
@@ -144,12 +180,13 @@ legend(
   fill = c("lightblue", 'darkblue'), bty = 'n')
 dev.off()
 ```
+
 ```{r barplotResponses, options}
 # æ is \u00E6
 # ø is \u00F8
 # å is \u00E5
 barplot(
-  ((as.matrix(yBuilding))), 
+  ((as.matrix(buildMeans))), 
   col = c("lightblue", 'darkblue'),
   border = "white",
   # main="Trivsel",
@@ -163,5 +200,100 @@ legend(
   "top",
   legend = c("Trivsel", "Effektivitet"),
   fill = c("lightblue", 'darkblue'), bty = 'n')
+```
+
+
+# Make building data
+```{r buildingSpecificVariables, options}
+buildings = split(d, f=d$spmHvor)
+for (build in buildings){
+  print(mean(build$spmTriv))
+}
+```
+
+# GLMM fit on errytin'
+```{r GLMMall, eval=F}
+set.seed(420)
+fitAll = glmm(spmTriv~0+Svartid, varcomps.names = c(""), data = d, family.glmm = Gaussian)
+dSummary = summary(d)
+head(d)
+```
+
+# GLM fit on Svartid
+```{r GLMtid, options}
+# Fit
+fitTidTriv = glm(factor(spmTriv, seq(1,5,1))~Svartid , data = d, family = "binomial")
+fitTidEff = glm(factor(spmEff, seq(1,5,1))~Svartid , data = d, family = "binomial")
+
+summary(fitTidTriv)$coefficients
+summary(fitTidEff)$coefficients
+summary(fitTidEff)
+```
+
+# GLM fit on noise types
+```{r glmNoiseTypes, options}
+factors = c('spmTriv', 'spmEff',
+            'byggestoy1', 'personstoy1','trafikk1','vifte1', 'annet1',
+            'byggestoy2', 'personstoy2','trafikk2','vifte2', 'annet2'
+            )
+dFactored = d
+# factorize = function()
+for (f in factors){
+  dFactored[f,] = factor(d[f,], seq(1,5,1), ordered = T)
+}
+
+fitTrivSource = glm(
+  factor(spmTriv, seq(1,5,1), ordered = T)~byggestoy1 + personstoy1 + trafikk1 + vifte1 + annet1,
+  data = dFactored, family = "binomial"
+)
+summary(fitTrivSource)
+cov(d$spmTriv, d$byggestoy1)
+cov(d$spmEff, d$byggestoy2)
+par(d)
+```
+
+# Initial data observations
+```{r initial, options}
+hist(d$spmTriv, breaks = seq(0.5,5.5,1), freq = F)
+lines(density(d$spmTriv, bw=1, from = 1, to = 5))
+hist(d$spmEff, breaks = seq(0.5,5.5,1), freq = F)
+lines(density(d$spmEff, bw=1, from = 1, to = 5))
+```
+
+
+# Linear models
+```{r linMods, options}
+lmTrivSource = lm(
+  spmTriv ~ byggestoy1 + personstoy1 + trafikk1 + vifte1 + annet1,
+  data=d
+)
+summary(lmTrivSource)
+# pairs(d[,apply(d[1,],2, FUN=is.numeric)])
+```
+
+```{r numericVals, options}
+dNumeric = select_if(d,is.numeric)
+head(dNumeric[,2:7])
+lmTrivSource = lm(spmTriv~., data = dNumeric[2:7])
+lmTrivCoefs = summary(lmTrivSource)$coefficients
+lmTIntercept = lmTrivCoefs['(Intercept)', 'Estimate']
+lmTBygg = lmTrivCoefs['byggestoy1', 'Estimate']
+lmTPers = lmTrivCoefs['personstoy1', 'Estimate']
+lmTVift = lmTrivCoefs['vifte1', 'Estimate']
+yEst = lmTBygg*(1:5) + lmTPers*(1:5) + lmTVift*(1:5)
+plot(dNumeric[,'byggestoy1'], dNumeric[,'spmTriv'], )
+plot(yEst)
+```
+
+```{r pairs, options}
+pairs(dNumeric[,2:7])
+library(GGally)
+ggpairs(dNumeric[,2:7])
+ggpairs(dNumeric[,8:13])
+```
+
+# Building relations
+```{r buildingLm, options}
+
 ```
 
