@@ -47,7 +47,7 @@ library(dplyr)
 ```
 
 # Data
-Dataformat is of tab separated values regarding noise on campus. Some variables are shown in the printout below. The response is `spmTriv` and `spmEff` which are "trivsel" and "effektivitet", respectively. The response is evaluated for each building block.
+Data format is of tab separated values regarding noise on campus. Some variables are shown in the printout below. The response is `spmTriv` and `spmEff` which are "trivsel" and "effektivitet", respectively. The response is evaluated for each building block.
 
 ## Load data and reformat
 ```{r reformatTime, options}
@@ -61,14 +61,14 @@ formatTime <- function(t) {
   for (i in seq(1, length(tSplit), 2)){
     s = s + switch(
       tSplit[i+1],
-      "dager" = strtoi(tSplit[i])*24*3600,
       "dag" = strtoi(tSplit[i])*24*3600,
-      "timer" = strtoi(tSplit[i])*3600,
+      "dager" = strtoi(tSplit[i])*24*3600,
       "time" = strtoi(tSplit[i])*3600,
+      "timer" = strtoi(tSplit[i])*3600,
       "minutt" = strtoi(tSplit[i])*60,
       "minutter" = strtoi(tSplit[i])*60,
-      "sekunder" = strtoi(tSplit[i]),
       "sekund" = strtoi(tSplit[i]),
+      "sekunder" = strtoi(tSplit[i]),
       0
     )
   }
@@ -83,17 +83,6 @@ d$Svartid=ftimes
 ```{r freeTextToFile, eval=F}
 write.csv(d[d[,'spmTekst']!="",c('NR','spmTekst')],"./data/freeTxt.csv", row.names = FALSE)
 ```
-
-<!-- ## Make response -->
-<!-- As mentioned, the responses are `spm3` and `spm4`. -->
-<!-- ```{r meanPerBuilding, options} -->
-<!-- # head(d) -->
-<!-- # variates = names(d) -->
-<!-- # yt = d$spmTriv -->
-<!-- # ye = d$spmEff -->
-<!-- locs = unique(d$spmHvor) -->
-<!-- locs -->
-<!-- ``` -->
 
 
 ```{r anc, options}
@@ -226,6 +215,26 @@ legend(
   fill = c("lightblue", 'darkblue'), bty = 'n')
 ```
 
+```{r saveBarplotResponsesSD, options}
+pdf(file = './figures/histTrivsel&EffektivitetSD.pdf', width = 10,height = 6)
+barplot(
+  ((as.matrix(buildSd))), 
+  col = c("lightblue", 'darkblue'),
+  border = "white",
+  # main="Trivsel",
+  ylab="Standardavvik",
+  beside = T,
+  las=2,
+  # ylim = c(0,5)
+  # space=0.1
+)
+legend(
+  "top",
+  legend = c("Trivsel", "Effektivitet"),
+  fill = c("lightblue", 'darkblue'), bty = 'n')
+dev.off()
+```
+
 
 # Make building data
 ```{r buildingSpecificVariables, options}
@@ -319,5 +328,74 @@ ggpairs(dNumeric[,8:13])
 # Building relations
 ```{r buildingLm, options}
 
+```
+
+
+
+# ANC and noise type correlation
+How to do this?
+Initially we will look at noise types and how much they disturb when the individual uses ANC compared to when the individual is not.
+```{r ANCNoisetype, options}
+ntTriv = colnames(d)[7:11]
+ntEff = colnames(d)[13:17]
+ntColnames = c(
+  'Konstruksjon', 'Person', 'Trafikk', 'Vifte', 'Annet')
+ntRownames = c(
+  'Trivsel m/ ANC', 'Trivsel u/ ANC', 'Effektivitet m/ ANC',
+  'Effektivitet u/ ANC')
+ntAnc = data.frame(
+  matrix(
+    ncol = length(ntTriv), nrow = 4,
+    dimnames=list(ntRownames, ntColnames)
+  )
+)
+
+# Find mean noise type disturbances
+ancBool = d[,"spmTiltak_1"] == "mNc"
+ntAnc[ntColnames] = c(
+  apply(d[ancBool, ntTriv], FUN = mean, MARGIN = 2),
+  apply(d[!ancBool, ntTriv], FUN = mean, MARGIN = 2),
+  apply(d[ancBool,ntEff], FUN = mean, MARGIN = 2),
+  apply(d[!ancBool,ntEff], FUN = mean, MARGIN = 2)
+)
+
+# Barplot
+reOrder = c(1,3,2,4)
+cols = c("#b1fbf5", '#d5a7fb', '#59f7ea', '#be77f9')
+barplot(
+  ((as.matrix(ntAnc[reOrder,]))), 
+  col = cols[reOrder],
+  border = "white",
+  # main="Trivsel",
+  ylab="P\u00E5virkning",
+  beside = T,
+  # las=2,
+  ylim = c(0,5)
+  # space=0.1
+)
+legend(
+  "top",
+  legend = ntRownames[reOrder],
+  fill = cols[reOrder], bty = 'n')
+```
+
+```{r saveANCnoiseType, eval=F, include=F}
+pdf(file = './figures/histANCnoiseType.pdf', width = 10,height = 6)
+barplot(
+  ((as.matrix(ntAnc[reOrder,]))), 
+  col = cols[reOrder],
+  border = "white",
+  # main="Trivsel",
+  ylab="P\u00E5virkning",
+  beside = T,
+  # las=2,
+  ylim = c(0,5)
+  # space=0.1
+)
+legend(
+  "top",
+  legend = ntRownames[reOrder],
+  fill = cols[reOrder], bty = 'n')
+dev.off()
 ```
 
