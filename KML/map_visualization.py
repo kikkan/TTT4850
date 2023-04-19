@@ -122,7 +122,7 @@ def get_heatmap_color(value):
 
 
 # RGB HEX
-intensity = 'CB'
+intensity = 'DC'
 R = 'FF'
 G = 'FF'
 B = '00'
