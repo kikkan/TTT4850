@@ -89,27 +89,35 @@ trivsel_dict = {
 
 
 def get_heatmap_color(value):
-    # Round the input value to the nearest integer
-    rounded_value = value
-    
-    # Map the rounded value to a color
+    # Map the input value to a color
+    # if value >= 1 and value < 1.5:
     r_hex = 0
     g_hex = 0
     b_hex = 0
-    if (rounded_value >= 0 and rounded_value < 1) :
-        # Blue
-        r_hex, g_hex, b_hex = 0, 0, 255
-    elif  (rounded_value >= 1 and rounded_value < 2) :
-        # Green
-        r_hex, g_hex, b_hex = 0, 255, 0
-    elif  (rounded_value >= 2 and rounded_value < 3) :
-        # Yellow
-        r_hex, g_hex, b_hex = 255, 255, 0
-    elif  (rounded_value >= 3 and rounded_value < 4) :
-        # Orange
-        r_hex, g_hex, b_hex = 255, 165, 0
-    elif  (rounded_value >= 4 and rounded_value <= 5) :
-        # Red
+
+    if value >= 1 and value < 1.5:
+        # Light blue
+        r_hex, g_hex, b_hex = 173, 216, 230
+    elif value >= 1.5 and value < 2:
+        # Dark blue
+        r_hex, g_hex, b_hex = 0, 0, 128
+    elif value >= 2 and value < 2.5:
+        # Light green
+        r_hex, g_hex, b_hex = 144, 238, 144
+    elif value >= 2.5 and value < 3:
+        # Dark green
+        r_hex, g_hex, b_hex = 0, 128, 0
+    elif value >= 3 and value < 3.5:
+        # Light yellow
+        r_hex, g_hex, b_hex = 255, 255, 153
+    elif value >= 3.5 and value < 4:
+        # Dark yellow
+        r_hex, g_hex, b_hex = 255, 215, 0
+    elif value >= 4 and value <= 4.5:
+        # Dark orange
+        r_hex, g_hex, b_hex = 255, 140, 0
+    else:
+        # Dark red
         r_hex, g_hex, b_hex = 255, 0, 0
     
     # Convert the RGB components to HEX strings and return them
@@ -120,9 +128,40 @@ def get_heatmap_color(value):
     return r_str, g_str, b_str
 
 
+    # # Round the input value to the nearest integer
+    # rounded_value = value
+    
+    # # Map the rounded value to a color
+    # r_hex = 0
+    # g_hex = 0
+    # b_hex = 0
+    # if (rounded_value >= 0 and rounded_value < 1) :
+    #     # Blue
+    #     r_hex, g_hex, b_hex = 0, 0, 255
+    # elif  (rounded_value >= 1 and rounded_value < 2) :
+    #     # Green
+    #     r_hex, g_hex, b_hex = 0, 255, 0
+    # elif  (rounded_value >= 2 and rounded_value < 3) :
+    #     # Yellow
+    #     r_hex, g_hex, b_hex = 255, 255, 0
+    # elif  (rounded_value >= 3 and rounded_value < 4) :
+    #     # Orange
+    #     r_hex, g_hex, b_hex = 255, 165, 0
+    # elif  (rounded_value >= 4 and rounded_value <= 5) :
+    #     # Red
+    #     r_hex, g_hex, b_hex = 255, 0, 0
+    
+    # # Convert the RGB components to HEX strings and return them
+    # r_str = format(r_hex, '02X')
+    # g_str = format(g_hex, '02X')
+    # b_str = format(b_hex, '02X')
+    
+    # return r_str, g_str, b_str
+
+
 
 # RGB HEX
-intensity = 'DC'
+intensity = 'FF'
 R = 'FF'
 G = 'FF'
 B = '00'
