@@ -75,7 +75,7 @@
         </Style>
         <Style id="60">
             <PolyStyle id="61">
-                <color>FF008000</color>
+                <color>FF90EE90</color>
                 <colorMode>normal</colorMode>
                 <fill>1</fill>
                 <outline>1</outline>
@@ -211,7 +211,7 @@
         </Style>
         <Style id="162">
             <PolyStyle id="163">
-                <color>FF00D7FF</color>
+                <color>FF99FFFF</color>
                 <colorMode>normal</colorMode>
                 <fill>1</fill>
                 <outline>1</outline>

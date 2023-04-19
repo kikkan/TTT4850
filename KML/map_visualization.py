@@ -29,7 +29,7 @@ effektivitet_dict = {
     "Central Building 1, center wing": 2.91,
     "Central Building 2, tower": 2.25,
     "Central Building 2, north wing": 2.25,
-    "Old Chemistry Building": 2.91, # Same as Central Building 1
+    "Old Chemistry Building": 2.25, # Same as Central Building 2, north wind
     "IT Building, south wing": 4.00,
     "IT Building": 0, # No data
     "Old Physics Building": 4.00,
@@ -39,8 +39,8 @@ effektivitet_dict = {
     "relation/13915142": 2.67,    # Realfagsbygget
     "way/1039396048": 3.95,       # Elektro F/E
     "way/1039395939": 3.86,       # Elektro B
-    "way/1039395938": 3.50,       # Varmeteksnik / Kjel
-    "way/1039395917": 2.75,          # Byggteknisk (2.75)
+    "way/1039395938": (3.50 + 3.00)/2,       # Varmeteksnik / Kjel
+    "way/1039395917": 2.75,       # Byggteknisk (2.75)
     "relation/184384": 0
 }
 
@@ -71,7 +71,7 @@ trivsel_dict = {
     "Central Building 1, center wing": 2.55,
     "Central Building 2, tower": 2.50,
     "Central Building 2, north wing": 2.50,
-    "Old Chemistry Building": 2.55, # Same as Central Building 1
+    "Old Chemistry Building": 2.55, # Same as Central Building 2, north wind
     "IT Building, south wing": 2.00,
     "IT Building": 0, # No data
     "Old Physics Building": 3.50,
@@ -81,8 +81,8 @@ trivsel_dict = {
     "relation/13915142": 2.60,    # Realfagsbygget
     "way/1039396048": 4.35,       # Elektro F/E
     "way/1039395939": 3.71,       # Elektro B
-    "way/1039395938": 3.50,       # Varmeteksnik / Kjel
-    "way/1039395917": 2.75,          # Byggteknisk (2.75)
+    "way/1039395938": (3.66 + 3.50)/2,       # Varmeteksnik / Kjel
+    "way/1039395917": 2.75,       # Byggteknisk (2.75)
     "relation/184384": 0
 }
 
