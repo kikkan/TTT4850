@@ -37,7 +37,7 @@ bygg_instabart = [
     'Verkstedtekniks'
     ]
 
-bygg_dict = {
+effektivitet_dict = {
     "NTNU. Main Administration Building": 2.60,
     "Fluids Engineering Building": 0, #
     "P-15": 2.25, # Tapirbygget
@@ -59,13 +59,13 @@ bygg_dict = {
     "Chemistry Block 4": 0, # No data
     "Chemistry Block 5": 2.00, 
     "Chemistry Hall": 0, # No data
-    "Central Building 1: 0, south wing": 2.91, 
-    "Central Building 1: 0, tower": 2.91,
-    "Central Building 1: 0, center wing": 2.91,
-    "Central Building 2: 0, tower": 2.25,
-    "Central Building 2: 0, north wing": 2.25,
+    "Central Building 1, south wing": 2.91, 
+    "Central Building 1, tower": 2.91,
+    "Central Building 1, center wing": 2.91,
+    "Central Building 2, tower": 2.25,
+    "Central Building 2, north wing": 2.25,
     "Old Chemistry Building": 0, # No data
-    "IT Building: 0, south wing": 4.00,
+    "IT Building, south wing": 4.00,
     "IT Building": 0, # No data
     "Old Physics Building": 4.00,
     "Electrical Engineering D+B2": 3.50,
@@ -157,8 +157,41 @@ bygg_geo_id = [
     'relation/184384'
 ]
 
+def get_heatmap_color(value):
+    # Round the input value to the nearest integer
+    rounded_value = value
+    
+    # Map the rounded value to a color
+    r_hex = 0
+    g_hex = 0
+    b_hex = 0
+    if (rounded_value >= 0 and rounded_value < 1) :
+        # Blue
+        r_hex, g_hex, b_hex = 0, 0, 255
+    elif  (rounded_value >= 1 and rounded_value < 2) :
+        # Green
+        r_hex, g_hex, b_hex = 0, 255, 0
+    elif  (rounded_value >= 2 and rounded_value < 3) :
+        # Yellow
+        r_hex, g_hex, b_hex = 255, 255, 0
+    elif  (rounded_value >= 3 and rounded_value < 4) :
+        # Orange
+        r_hex, g_hex, b_hex = 255, 165, 0
+    elif  (rounded_value >= 4 and rounded_value < 5) :
+        # Red
+        r_hex, g_hex, b_hex = 255, 0, 0
+    
+    # Convert the RGB components to HEX strings and return them
+    r_str = format(r_hex, '02X')
+    g_str = format(g_hex, '02X')
+    b_str = format(b_hex, '02X')
+    
+    return r_str, g_str, b_str
+
+
+
 # RGB HEX
-intensity = 'FF'
+intensity = 'CB'
 R = 'FF'
 G = 'FF'
 B = '00'
@@ -184,13 +217,23 @@ for feature in data['features']:
     except:
         name = ''
 
-    if name in bygg_geo_engelsk:
-        output_list.append(name)
+
+    if name in effektivitet_dict:
+        g_value = 0
+        for key, value in effektivitet_dict.items():
+            if key == name:
+                g_value = value
+
+                R, G, B = get_heatmap_color(value)
+        if g_value == 0:
+            continue
+
         if geom_type == 'Polygon' :
             test = kml.newpolygon(name=name,
                         outerboundaryis=geom['coordinates'][0])
+            test.style.polystyle.color = intensity + B + G + R                         
             # test.style.polystyle.color = intensity + B + G + R 
-            test.style.polystyle.colormode = 'random'
+            # test.style.polystyle.colormode = 'random'
 
     # Execptions for buildings without name
     prop = feature['properties']
@@ -199,13 +242,25 @@ for feature in data['features']:
     except:
         _id = ''
     
-    if _id in bygg_geo_id:
-        output_list.append(_id)
+    if _id in effektivitet_dict:
+
+        for key, value in effektivitet_dict.items():
+            if key == name:
+                if value == 0:
+                    break
+                R, G, B = get_heatmap_color(value)
+        if g_value == 0:
+            continue
+
+        if g_value == 6:
+            R = "FF"
+            G = "FF"
+            B = "FF"
+
         if geom_type == 'Polygon':
             test = kml.newpolygon(name=name,
                         outerboundaryis=geom['coordinates'][0])
-            #test.style.polystyle.color = intensity + B + G + R 
-            test.style.polystyle.colormode = 'random'
+            test.style.polystyle.color = intensity + B + G + R 
+            # test.style.polystyle.colormode = 'random'
     
-print(output_list)
-#kml.save('KML/output/kml_file.kml')
+kml.save('KML/output/kml_file.kml')
