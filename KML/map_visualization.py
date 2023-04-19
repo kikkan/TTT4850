@@ -188,7 +188,7 @@ for feature in data['features']:
             B = "FF"
 
         if geom_type == 'Polygon':
-            test = kml.newpolygon(name=name,
+            test = kml.newpolygon(name=_id,
                         outerboundaryis=geom['coordinates'][0])
             test.style.polystyle.color = intensity + B + G + R 
             # test.style.polystyle.colormode = 'random'
@@ -197,64 +197,64 @@ kml.save('KML/output/heatmap_effektivitet.kml')
 
 # TRIVSEL
 # Iterate throug the geojson file
-for feature in data['features']:
-    geom = feature['geometry']
-    geom_type = geom['type']
+# for feature in data['features']:
+#     geom = feature['geometry']
+#     geom_type = geom['type']
     
-    # Get name of buildings
-    prop = feature['properties']
-    try: 
-        try:
-            name = prop['name:en']
-        except:
-            name = prop['name']
-    except:
-        name = ''
+#     # Get name of buildings
+#     prop = feature['properties']
+#     try: 
+#         try:
+#             name = prop['name:en']
+#         except:
+#             name = prop['name']
+#     except:
+#         name = ''
 
     
-    if name in trivsel_dict:
-        g_value = 0
-        for key, value in trivsel_dict.items():
-            if key == name:
-                g_value = value
+#     if name in trivsel_dict:
+#         g_value = 0
+#         for key, value in trivsel_dict.items():
+#             if key == name:
+#                 g_value = value
 
-                R, G, B = get_heatmap_color(value)
-        if g_value == 0:
-            continue
+#                 R, G, B = get_heatmap_color(value)
+#         if g_value == 0:
+#             continue
 
-        if geom_type == 'Polygon' :
-            test = kml.newpolygon(name=name,
-                        outerboundaryis=geom['coordinates'][0])
-            test.style.polystyle.color = intensity + B + G + R                         
-            # test.style.polystyle.color = intensity + B + G + R 
-            # test.style.polystyle.colormode = 'random'
+#         if geom_type == 'Polygon' :
+#             test = kml.newpolygon(name=name,
+#                         outerboundaryis=geom['coordinates'][0])
+#             test.style.polystyle.color = intensity + B + G + R                         
+#             # test.style.polystyle.color = intensity + B + G + R 
+#             # test.style.polystyle.colormode = 'random'
 
-    # Execptions for buildings without name
-    prop = feature['properties']
-    try:
-        _id = prop['@id']
-    except:
-        _id = ''
+#     # Execptions for buildings without name
+#     prop = feature['properties']
+#     try:
+#         _id = prop['@id']
+#     except:
+#         _id = ''
     
-    if _id in trivsel_dict:
+#     if _id in trivsel_dict:
 
-        for key, value in trivsel_dict.items():
-            if key == name:
-                if value == 0:
-                    break
-                R, G, B = get_heatmap_color(value)
-        if g_value == 0:
-            continue
+#         for key, value in trivsel_dict.items():
+#             if key == name:
+#                 if value == 0:
+#                     break
+#                 R, G, B = get_heatmap_color(value)
+#         if g_value == 0:
+#             continue
 
-        if g_value == 6:
-            R = "FF"
-            G = "FF"
-            B = "FF"
+#         if g_value == 6:
+#             R = "FF"
+#             G = "FF"
+#             B = "FF"
     
-        if geom_type == 'Polygon':
-            test = kml.newpolygon(name=name,
-                        outerboundaryis=geom['coordinates'][0])
-            test.style.polystyle.color = intensity + B + G + R 
-            # test.style.polystyle.colormode = 'random'
+#         if geom_type == 'Polygon':
+#             test = kml.newpolygon(name=name,
+#                         outerboundaryis=geom['coordinates'][0])
+#             test.style.polystyle.color = intensity + B + G + R 
+#             # test.style.polystyle.colormode = 'random'
     
 kml.save('KML/output/heatmap_trivsel.kml') 
