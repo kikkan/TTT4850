@@ -13,9 +13,9 @@ effektivitet_dict = {
     "World Championship Pavilion": 0, # No data
     "Geology Building": 0, # No data
     "PFI Building": 0, # No data
-    "Materials Engineering Laboratory": 0, # No data
+    "Materials Engineering Laboratory": 3.22, # Verk
     "Perleporten": 0, # No data
-    "Materials Technology Building": 3.22, # Verk
+    "Materials Technology Building": 0, # No data
     "Building Technology": 2.75, # Byggteknisk
     "Chemistry Block 1": 3.33,
     "Chemistry Block 2": 4.00,
@@ -29,7 +29,7 @@ effektivitet_dict = {
     "Central Building 1, center wing": 2.91,
     "Central Building 2, tower": 2.25,
     "Central Building 2, north wing": 2.25,
-    "Old Chemistry Building": 0, # No data
+    "Old Chemistry Building": 2.91, # Same as Central Building 1
     "IT Building, south wing": 4.00,
     "IT Building": 0, # No data
     "Old Physics Building": 4.00,
@@ -40,7 +40,7 @@ effektivitet_dict = {
     "way/1039396048": 3.95,       # Elektro F/E
     "way/1039395939": 3.86,       # Elektro B
     "way/1039395938": 3.50,       # Varmeteksnik / Kjel
-    "way/1039395917": 0,          # Byggteknisk (2.75)
+    "way/1039395917": 2.75,          # Byggteknisk (2.75)
     "relation/184384": 0
 }
 
@@ -55,9 +55,9 @@ trivsel_dict = {
     "World Championship Pavilion": 0, # No data
     "Geology Building": 0, # No data
     "PFI Building": 0, # No data
-    "Materials Engineering Laboratory": 0, # No data
+    "Materials Engineering Laboratory": 2.78, # Verk
     "Perleporten": 0, # No data
-    "Materials Technology Building": 2.78, # Verk
+    "Materials Technology Building": 0, # No data
     "Building Technology": 2.50, # Byggteknisk
     "Chemistry Block 1": 3.00,
     "Chemistry Block 2": 5.00,
@@ -71,7 +71,7 @@ trivsel_dict = {
     "Central Building 1, center wing": 2.55,
     "Central Building 2, tower": 2.50,
     "Central Building 2, north wing": 2.50,
-    "Old Chemistry Building": 0, # No data
+    "Old Chemistry Building": 2.55, # Same as Central Building 1
     "IT Building, south wing": 2.00,
     "IT Building": 0, # No data
     "Old Physics Building": 3.50,
@@ -82,7 +82,7 @@ trivsel_dict = {
     "way/1039396048": 4.35,       # Elektro F/E
     "way/1039395939": 3.71,       # Elektro B
     "way/1039395938": 3.50,       # Varmeteksnik / Kjel
-    "way/1039395917": 0,          # Byggteknisk (2.75)
+    "way/1039395917": 2.75,          # Byggteknisk (2.75)
     "relation/184384": 0
 }
 
@@ -108,7 +108,7 @@ def get_heatmap_color(value):
     elif  (rounded_value >= 3 and rounded_value < 4) :
         # Orange
         r_hex, g_hex, b_hex = 255, 165, 0
-    elif  (rounded_value >= 4 and rounded_value < 5) :
+    elif  (rounded_value >= 4 and rounded_value <= 5) :
         # Red
         r_hex, g_hex, b_hex = 255, 0, 0
     
@@ -126,6 +126,8 @@ intensity = 'CB'
 R = 'FF'
 G = 'FF'
 B = '00'
+
+GRAY = 'FF'
 
 with open("KML/files/export.geojson", 'r') as f:
     data = json.load(f)
@@ -156,7 +158,9 @@ for feature in data['features']:
                 R, G, B = get_heatmap_color(value)
         
         if g_value == 0:
-            continue
+            B = GRAY  
+            G = GRAY
+            R = GRAY
         
         if geom_type == 'Polygon' :
             test = kml.newpolygon(name=name,
@@ -179,7 +183,9 @@ for feature in data['features']:
                 R, G, B = get_heatmap_color(value)
                
         if g_value == 0:
-            continue   
+            B = "FF"  
+            G = "FF"
+            R = "FF"
 
         if geom_type == 'Polygon':
             test = kml.newpolygon(name=_id,
@@ -191,64 +197,62 @@ kml.save('KML/output/heatmap_effektivitet.kml')
 
 # TRIVSEL
 # Iterate throug the geojson file
-# for feature in data['features']:
-#     geom = feature['geometry']
-#     geom_type = geom['type']
+for feature in data['features']:
+    geom = feature['geometry']
+    geom_type = geom['type']
     
-#     # Get name of buildings
-#     prop = feature['properties']
-#     try: 
-#         try:
-#             name = prop['name:en']
-#         except:
-#             name = prop['name']
-#     except:
-#         name = ''
+    # Get name of buildings
+    prop = feature['properties']
+    try: 
+        try:
+            name = prop['name:en']
+        except:
+            name = prop['name']
+    except:
+        name = ''
 
     
-#     if name in trivsel_dict:
-#         g_value = 0
-#         for key, value in trivsel_dict.items():
-#             if key == name:
-#                 g_value = value
+    if name in trivsel_dict:
+        g_value = 0
+        for key, value in trivsel_dict.items():
+            if key == name:
+                g_value = value
+                R, G, B = get_heatmap_color(value)
+        
+        if g_value == 0:
+            B = GRAY  
+            G = GRAY
+            R = GRAY
+        
+        if geom_type == 'Polygon' :
+            test = kml.newpolygon(name=name,
+                        outerboundaryis=geom['coordinates'][0])
+            test.style.polystyle.color = intensity + B + G + R                         
+            # test.style.polystyle.colormode = 'random'
 
-#                 R, G, B = get_heatmap_color(value)
-#         if g_value == 0:
-#             continue
-
-#         if geom_type == 'Polygon' :
-#             test = kml.newpolygon(name=name,
-#                         outerboundaryis=geom['coordinates'][0])
-#             test.style.polystyle.color = intensity + B + G + R                         
-#             # test.style.polystyle.color = intensity + B + G + R 
-#             # test.style.polystyle.colormode = 'random'
-
-#     # Execptions for buildings without name
-#     prop = feature['properties']
-#     try:
-#         _id = prop['@id']
-#     except:
-#         _id = ''
+    # Execptions for buildings without name
+    prop = feature['properties']
+    try:
+        _id = prop['@id']
+    except:
+        _id = ''
     
-#     if _id in trivsel_dict:
+    if _id in trivsel_dict:
 
-#         for key, value in trivsel_dict.items():
-#             if key == name:
-#                 if value == 0:
-#                     break
-#                 R, G, B = get_heatmap_color(value)
-#         if g_value == 0:
-#             continue
+        for key, value in trivsel_dict.items():
+            if key == _id:
+                g_value = value
+                R, G, B = get_heatmap_color(value)
+               
+        if g_value == 0:
+            B = "FF"  
+            G = "FF"
+            R = "FF"
 
-#         if g_value == 6:
-#             R = "FF"
-#             G = "FF"
-#             B = "FF"
+        if geom_type == 'Polygon':
+            test = kml.newpolygon(name=_id,
+                        outerboundaryis=geom['coordinates'][0])
+            test.style.polystyle.color = intensity + B + G + R 
+            # test.style.polystyle.colormode = 'random'
     
-#         if geom_type == 'Polygon':
-#             test = kml.newpolygon(name=name,
-#                         outerboundaryis=geom['coordinates'][0])
-#             test.style.polystyle.color = intensity + B + G + R 
-#             # test.style.polystyle.colormode = 'random'
-    
-# kml.save('KML/output/heatmap_trivsel.kml') 
+kml.save('KML/output/heatmap_trivsel.kml') 
