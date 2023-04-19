@@ -40,8 +40,8 @@ effektivitet_dict = {
     "way/1039396048": 3.95,       # Elektro F/E
     "way/1039395939": 3.86,       # Elektro B
     "way/1039395938": 3.50,       # Varmeteksnik / Kjel
-    "way/1039395917": 6,          # Byggteknisk (2.75)
-    "relation/184384": 7
+    "way/1039395917": 0,          # Byggteknisk (2.75)
+    "relation/184384": 0
 }
 
 trivsel_dict = {
@@ -82,8 +82,8 @@ trivsel_dict = {
     "way/1039396048": 4.35,       # Elektro F/E
     "way/1039395939": 3.71,       # Elektro B
     "way/1039395938": 3.50,       # Varmeteksnik / Kjel
-    "way/1039395917": 6,          # Byggteknisk (2.75)
-    "relation/184384": 7
+    "way/1039395917": 0,          # Byggteknisk (2.75)
+    "relation/184384": 0
 }
 
 
@@ -153,16 +153,15 @@ for feature in data['features']:
         for key, value in effektivitet_dict.items():
             if key == name:
                 g_value = value
-
                 R, G, B = get_heatmap_color(value)
+        
         if g_value == 0:
             continue
-
+        
         if geom_type == 'Polygon' :
             test = kml.newpolygon(name=name,
                         outerboundaryis=geom['coordinates'][0])
             test.style.polystyle.color = intensity + B + G + R                         
-            # test.style.polystyle.color = intensity + B + G + R 
             # test.style.polystyle.colormode = 'random'
 
     # Execptions for buildings without name
@@ -175,17 +174,12 @@ for feature in data['features']:
     if _id in effektivitet_dict:
 
         for key, value in effektivitet_dict.items():
-            if key == name:
-                if value == 0:
-                    break
+            if key == _id:
+                g_value = value
                 R, G, B = get_heatmap_color(value)
+               
         if g_value == 0:
-            continue
-
-        if g_value == 6:
-            R = "FF"
-            G = "FF"
-            B = "FF"
+            continue   
 
         if geom_type == 'Polygon':
             test = kml.newpolygon(name=_id,
@@ -257,4 +251,4 @@ kml.save('KML/output/heatmap_effektivitet.kml')
 #             test.style.polystyle.color = intensity + B + G + R 
 #             # test.style.polystyle.colormode = 'random'
     
-kml.save('KML/output/heatmap_trivsel.kml') 
+# kml.save('KML/output/heatmap_trivsel.kml') 
