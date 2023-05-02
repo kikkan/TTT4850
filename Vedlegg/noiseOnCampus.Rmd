@@ -1,0 +1,1142 @@
+---
+title: "Title"
+author: "Christian Oppegård Moen"
+date: "DD MM YYYY"
+output: 
+  bookdown::pdf_document2:
+    toc_depth: '3' # Depth of contents
+    number_sections: false
+  # pdf_document:
+  # #   toc: no
+  #   toc_depth: '3'
+subtitle: Course
+urlcolor: blue
+editor_options: 
+  chunk_output_type: console
+header-includes:
+- \usepackage[width=0.8\textwidth]{caption} # add caption to figures.
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  echo = T, tidy=T, message=F, warning=F,
+  strip.white=F, # Strips whitespace
+  prompt=F, #?
+  cache=T, # Cache for quick knit.
+  # root.dir = "./subfolder",
+  size="scriptsize",
+  fig.width=7, 
+  fig.height=5, 
+  fig.align = "center"
+)
+```
+
+```{r config, include=F}
+if (F){
+  setwd("C:/Users/kikka/OneDrive - NTNU/Fysmat/8 Semester V2022/RomStat/romstat/project3")
+  options(error=recover)
+  options(error=NULL)
+}
+```
+
+# Libraries & misc
+```{r libraries, options}
+library(Rmisc)
+library(glmm)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(nlme)
+library(lme4)
+```
+
+```{r defaultSettings, options}
+defaultMar = c(5.1, 4.1, 4.1, 2.1)
+
+```
+
+# Data
+Data format is of tab separated values regarding noise on campus. Some variables are shown in the printout below. The response is `spmTriv` and `spmEff` which are "trivsel" and "effektivitet", respectively. The response is evaluated for each building block.
+
+## Load data and reformat
+The time is on a unfeasible format, so we format it to total seconds used.
+```{r reformatTime, options}
+pathData = "./data"
+d = read.delim("./data/data-315297-2023-03-08-1434-utf.txt", header=T)
+
+# Reformat the time to be total time in seconds
+formatTime <- function(t) {
+  tSplit = strsplit(t, ' ')[[1]]
+  s=0
+  for (i in seq(1, length(tSplit), 2)){
+    s = s + switch(
+      tSplit[i+1],
+      "dag" = strtoi(tSplit[i])*24*3600,
+      "dager" = strtoi(tSplit[i])*24*3600,
+      "time" = strtoi(tSplit[i])*3600,
+      "timer" = strtoi(tSplit[i])*3600,
+      "minutt" = strtoi(tSplit[i])*60,
+      "minutter" = strtoi(tSplit[i])*60,
+      "sekund" = strtoi(tSplit[i]),
+      "sekunder" = strtoi(tSplit[i]),
+      0
+    )
+  }
+  return(s)
+}
+
+ftimes = unlist(lapply(d$Svartid, formatTime))
+head(cbind(old=d$Svartid, new=ftimes))
+d$Svartid=ftimes
+```
+
+```{r freeTextToFile, eval=F, include=F}
+write.csv(d[d[,'spmTekst']!="",c('NR','spmTekst')],"./data/freeTxt.csv", row.names = FALSE)
+```
+
+
+
+# Initial values
+In this section we take the initial look at the data by considering sample means, SDs, conf.ints and some graphs being plots of said values, histograms and more.
+
+## "How many" numbers
+How many did something about the noise.
+```{r howManyTiltak, options}
+# head(d)
+# head(d[,18:(18+6)])
+dTiltak = d[,18:(18+6)]
+hasAns = function(x){return (sum(x!=""))}
+dTiltakSum = apply(dTiltak, FUN = hasAns, MARGIN = 2)
+dTiltakSum
+```
+
+## Total mean, SD, CI
+We compute the sample mean, SD and confidence intervals of `effektivitet` and `trivsel` of the entire data set. We also take a look at their distribution by looking at the histograms.
+```{r totMeanSDCI, options}
+effTrivInit = cbind(t(apply(d[, c('spmEff', 'spmTriv')], 2, FUN = CI)), c(sd(d$spmEff), sd(d$spmTriv)))
+colnames(effTrivInit) = c(colnames(effTrivInit)[1:3], 'SD')
+effTrivInit
+
+# Histograms
+histCounts = as.data.frame(rbind(hist(d$spmTriv, breaks = seq(0.5,5.5,1), plot = F)$counts,
+               hist(d$spmEff, breaks = seq(0.5,5.5,1), plot = F)$counts))
+rownames(histCounts) = c('trivsel', 'effektivitet')
+colnames(histCounts) = 1:5
+
+histCounts
+
+barplot(
+  ((as.matrix(histCounts))), 
+  col = c("lightblue", 'darkblue'),
+  border = "white",
+  # main="Trivsel",
+  ylab="Antall svar",
+  xlab = "P\u00E5virkning",
+  beside = T,
+  las=1
+  # ylim = c(0,5)
+  # space=0.1
+)
+legend(
+  "topright",
+  legend = c("Trivsel", "Effektivitet"),
+  fill = c("lightblue", 'darkblue'), bty = 'n')
+```
+
+
+```{r save_totMeanSDCI_Hist, include=FALSE, eval=FALSE}
+pdf(file = './figures/histTrivsel&EffektivitetTotal.pdf', width = 10,height = 6)
+
+barplot(
+  ((as.matrix(histCounts))), 
+  col = c("lightblue", 'darkblue'),
+  border = "white",
+  # main="Trivsel",
+  ylab="Antall svar",
+  xlab = "P\u00E5virkning",
+  beside = T,
+  las=1
+  # ylim = c(0,5)
+  # space=0.1
+)
+legend(
+  "topright",
+  legend = c("Trivsel", "Effektivitet"),
+  fill = c("lightblue", 'darkblue'), bty = 'n')
+dev.off()
+```
+
+
+## Location Analysis
+Let's look at some initial location based data. First, how many answers per building.
+```{r perBuilInit, options}
+# All locations/buildings
+locs = unique(d$spmHvor) # all locations in this dataset
+buildInit = data.frame(
+  matrix(ncol=length(locs),
+         nrow=5, 
+         dimnames=list(c('count', 'meanEff', 'SDEff', 'meanTriv', 'SDTriv'), locs))
+)
+
+for (loc in locs){
+  buildInit[loc] = c(sum(d$spmHvor==loc),
+             mean(d$spmEff[d$spmHvor==loc]),
+              sd(d$spmEff[d$spmHvor==loc]),
+             mean(d$spmTriv[d$spmHvor==loc]),
+              sd(d$spmTriv[d$spmHvor==loc]))
+}
+
+# Count, mean and standard deviation per building
+round(buildInit,1)
+
+# Sorted values for readability
+sort(round(buildInit['meanTriv',],1))
+sort(round(buildInit['meanEff',],1))
+sort(round(buildInit['SDTriv',],1))
+sort(round(buildInit['SDEff',],1))
+
+# Barplot of counts for readability
+buildNames = c(
+  'Elektro D',
+  "Elektro B",
+  "Kjelhuset",
+  "Elektro E",
+  "Realfag",
+  "Sentralbygg 2",
+  "Verkstedteknisk",
+  "Byggteknsik",
+  "Sentralbygg 1",
+  "Handelsh\u00F8gskolen",
+  "Tapirbygget",
+  "Berg",
+  "Gamle elektro",
+  "Hovedbygget",
+  "Varmeteknisk",
+  "Gruveteknisk",
+  "Gamle fysikk",
+  "IT-bygget syd",
+  "Kjemiblokk 1",
+  "Kjemiblokk 2",
+  "Elektro A",
+  "Kjemiblokk 5",
+  "IPD"
+)
+par(mar=defaultMar+c(3,0,0,0))
+barplot(
+  ((as.matrix(buildInit['count',]))), 
+  col = c("lightblue"),
+  border = "white",
+  # main="Trivsel",
+  ylab="Antall svar",
+  names.arg = buildNames,
+  # xlab = "Lokasjon",
+  beside = T,
+  las=2
+  # ylim = c(0,5)
+  # space=0.1
+)
+par(mar=defaultMar)
+```
+
+```{r saveBuildNumber, include=F, eval=F}
+pdf(file = './figures/histAnsPerBuild.pdf', width = 10,height = 6)
+par(mar=defaultMar+c(3,0,0,0))
+barplot(
+  ((as.matrix(buildInit['count',]))), 
+  col = c("lightblue"),
+  border = "white",
+  # main="Trivsel",
+  ylab="Antall svar",
+  # xlab = "Lokasjon",
+  beside = T,
+  las=2,
+  names.arg = buildNames
+  # ylim = c(0,5)
+  # space=0.1
+)
+dev.off()
+```
+
+
+### Barplot of responses
+Compute responses
+```{r response, options}
+# initiate per building empirical mean data frame
+buildMeans = data.frame(
+  matrix(ncol=length(locs),
+         nrow=2, 
+         dimnames=list(c('trivsel', 'effektivitet'), locs))
+  )
+# initiate per building standard deviation data frame
+buildSd = data.frame(
+  matrix(ncol=length(locs),
+         nrow=2, 
+         dimnames=list(c('trivsel', 'effektivitet'), locs))
+  )
+# Compute means and SDs
+for (loc in locs){
+  buildMeans[loc] = c(mean(d$spmTriv[d$spmHvor==loc]),
+             mean(d$spmEff[d$spmHvor==loc]))
+  buildSd[loc] = c(sd(d$spmTriv[d$spmHvor==loc]),
+             sd(d$spmEff[d$spmHvor==loc]))
+} 
+
+# Mean values per location
+round(sort(buildMeans['trivsel',]),2)
+round(sort(buildMeans['effektivitet',]),2)
+```
+
+```{r writeTo.dat, eval=F, include=F}
+# means
+write.table(
+  t(buildMeans['trivsel',]), 
+  file= paste(pathData,'/trivselPerBygning.dat',sep = ""), 
+  row.names = T, sep = ',', quote = F
+)
+write.table(
+  t(buildMeans['effektivitet',]), 
+  file= paste(pathData,'/effektivitetPerBygning.dat',sep = ""), 
+  row.names = T, sep = ',', quote = F
+)
+# Standard deviations (sd)
+write.table(
+  t(buildSd['trivsel',]), 
+  file= paste(pathData,'/trivselPerBygningSD.dat',sep = ""), 
+  row.names = T, sep = ',', quote = F
+)
+write.table(
+  t(buildSd['effektivitet',]), 
+  file= paste(pathData,'/effektivitetPerBygningSD.dat',sep = ""), 
+  row.names = T, sep = ',', quote = F
+)
+```
+
+Plot responses
+```{r barplotResponses, options}
+# æ is \u00E6
+# ø is \u00F8
+# å is \u00E5
+par(mar=defaultMar+c(3,0,0,0))
+barplot(
+  ((as.matrix(buildMeans))), 
+  col = c("lightblue", 'darkblue'),
+  border = "white",
+  # main="Trivsel",
+  ylab="P\u00E5virkning",
+  beside = T,
+  las=2,
+  names.arg = buildNames,
+  ylim = c(0,5)
+  # space=0.1
+)
+
+legend(
+  "top",
+  legend = c("Trivsel", "Effektivitet"),
+  fill = c("lightblue", 'darkblue'), bty = 'n')
+d['Elektro_D.B2',]
+head(d)
+mTriv= max(buildMeans['trivsel',])
+mEff = max(buildMeans['effektivitet',])
+buildMeans['effektivitet',buildMeans['effektivitet',]==mEff]
+buildMeans['trivsel',buildMeans['trivsel',]==mTriv]
+```
+
+```{r barplotResponseSD, options}
+barplot(
+  ((as.matrix(buildSd))), 
+  col = c("lightblue", 'darkblue'),
+  border = "white",
+  # main="Trivsel",
+  ylab="Standardavvik",
+  beside = T,
+  las=2,
+  names.arg = buildNames
+  # ylim = c(0,5)
+  # space=0.1
+)
+legend(
+  "top",
+  legend = c("Trivsel", "Effektivitet"),
+  fill = c("lightblue", 'darkblue'), bty = 'n')
+```
+
+```{r saveResponseBarplot, include=FALSE, eval=FALSE}
+# æ is \u00E6
+# ø is \u00F8
+# å is \u00E5
+pdf(file = './figures/histTrivsel&Effektivitet.pdf', width = 10,height = 6)
+par(mar=defaultMar+c(3,0,0,0))
+barplot(
+  ((as.matrix(buildMeans))), 
+  col = c("lightblue", 'darkblue'),
+  border = "white",
+  # main="Trivsel",
+  ylab="P\u00E5virkning",
+  beside = T,
+  las=2,
+  ylim = c(0,5),
+  names.arg = buildNames,
+  # space=0.1
+)
+legend(
+  "top",
+  legend = c("Trivsel", "Effektivitet"),
+  fill = c("lightblue", 'darkblue'), bty = 'n')
+dev.off()
+```
+
+
+```{r saveBarplotResponsesSD, eval=FALSE, include=FALSE}
+pdf(file = './figures/histTrivsel&EffektivitetSD.pdf', width = 10,height = 6)
+par(mar=defaultMar+c(3,0,0,0))
+barplot(
+  ((as.matrix(buildSd))), 
+  col = c("lightblue", 'darkblue'),
+  border = "white",
+  # main="Trivsel",
+  ylab="Standardavvik",
+  beside = T,
+  las=2,
+  names.arg = buildNames
+  # ylim = c(0,5)
+  # space=0.1
+)
+legend(
+  "top",
+  legend = c("Trivsel", "Effektivitet"),
+  fill = c("lightblue", 'darkblue'), bty = 'n')
+dev.off()
+par(mar=defaultMar)
+```
+
+
+<!-- # Make building data -->
+<!-- ```{r buildingSpecificVariables, options} -->
+<!-- # buildings = split(d, f=d$spmHvor) -->
+<!-- # for (build in buildings){ -->
+<!-- #   print(mean(build$spmTriv)) -->
+<!-- # } -->
+<!-- ``` -->
+
+<!-- # GLMM fit on errytin' -->
+<!-- ```{r GLMMall, eval=F} -->
+<!-- # set.seed(420) -->
+<!-- # fitAll = glmm(spmTriv~0+Svartid, varcomps.names = c(""), data = d, family.glmm = Gaussian) -->
+<!-- # dSummary = summary(d) -->
+<!-- # head(d) -->
+<!-- ``` -->
+
+<!-- # GLM fit on Svartid -->
+<!-- ```{r GLMtid, options} -->
+<!-- # # Fit -->
+<!-- # fitTidTriv = glm(factor(spmTriv, seq(1,5,1))~Svartid , data = d, family = "binomial") -->
+<!-- # fitTidEff = glm(factor(spmEff, seq(1,5,1))~Svartid , data = d, family = "binomial") -->
+<!-- #  -->
+<!-- # summary(fitTidTriv)$coefficients -->
+<!-- # summary(fitTidEff)$coefficients -->
+<!-- # summary(fitTidEff) -->
+<!-- ``` -->
+
+<!-- # GLM fit on noise types -->
+<!-- ```{r glmNoiseTypes, options} -->
+<!-- # factors = c('spmTriv', 'spmEff', -->
+<!-- #             'byggestoy1', 'personstoy1','trafikk1','vifte1', 'annet1', -->
+<!-- #             'byggestoy2', 'personstoy2','trafikk2','vifte2', 'annet2' -->
+<!-- #             ) -->
+<!-- # dFactored = d -->
+<!-- # # factorize = function() -->
+<!-- # for (f in factors){ -->
+<!-- #   dFactored[f,] = factor(d[f,], seq(1,5,1), ordered = T) -->
+<!-- # } -->
+<!-- #  -->
+<!-- # fitTrivSource = glm( -->
+<!-- #   factor(spmTriv, seq(1,5,1), ordered = T)~byggestoy1 + personstoy1 + trafikk1 + vifte1 + annet1, -->
+<!-- #   data = dFactored, family = "binomial" -->
+<!-- # ) -->
+<!-- # summary(fitTrivSource) -->
+<!-- # cov(d$spmTriv, d$byggestoy1) -->
+<!-- # cov(d$spmEff, d$byggestoy2) -->
+<!-- # par(d) -->
+<!-- ``` -->
+
+
+
+
+
+
+<!-- # Linear models -->
+<!-- Fitting linear model with covariates being noise types. -->
+<!-- ```{r linMods, options} -->
+<!-- lmTrivSource = lm( -->
+<!--   spmTriv ~ -1 + byggestoy1 + personstoy1 + trafikk1 + vifte1 + annet1, -->
+<!--   data=d -->
+<!-- ) -->
+<!-- lmNTcoefs = summary(lmTrivSource)$coefficients -->
+<!-- signCoefs = lmNTcoefs[lmNTcoefs[,4]<1e-2, ] -->
+<!-- lmNTcoefs # all coefficients -->
+<!-- signCoefs # significant coefficients -->
+<!-- ``` -->
+
+
+<!-- ```{r numericVals, options} -->
+<!-- dNumeric = select_if(d,is.numeric) -->
+<!-- # head(dNumeric[,2:7]) -->
+<!-- lmTrivSource = lm(spmTriv~., data = dNumeric[2:7]) -->
+<!-- lmTrivCoefs = summary(lmTrivSource)$coefficients -->
+<!-- lmTIntercept = lmTrivCoefs['(Intercept)', 'Estimate'] -->
+<!-- lmTBygg = lmTrivCoefs['byggestoy1', 'Estimate'] -->
+<!-- lmTPers = lmTrivCoefs['personstoy1', 'Estimate'] -->
+<!-- lmTVift = lmTrivCoefs['vifte1', 'Estimate'] -->
+<!-- yEst = lmTBygg*(1:5) + lmTPers*(1:5) + lmTVift*(1:5) -->
+<!-- plot(dNumeric[,'byggestoy1'], dNumeric[,'spmTriv'], ) -->
+<!-- plot(yEst) -->
+<!-- ``` -->
+
+
+# Pairs plots
+Visualization of each data value compared to each other. Neat for initial data observations.
+```{r pairs, options}
+# pairs(dNumeric[,2:7])
+library(GGally)
+dNumeric = select_if(d,is.numeric)
+ggpairs(dNumeric[,2:7]) # Trivsel pairs
+ggpairs(dNumeric[,8:13]) # Effektivitet pairs
+```
+
+# Noise type analysis
+In this section we will take a look at each noise type and how much people feel like it influences their efficiency and well-being. 
+<!-- First we consider what each individual has set the noise type influence e.g., `byggestoy1`$=3$, and then we consider a weighted result where the wights are the overall influence divided by $5$, e.g., `effektivitet/5*byggestoy1`. -->
+
+## Noise type mean and SD barplot. (Discarded)
+```{r tempNecessities, options}
+# setup
+ntColnames = c('Konstruksjon', 'Person', 'Trafikk', 'Vifte', 'Annet')
+nts = c('Konstruksjon', 'Person', 'Trafikk', 'Vifte', 'Annet')
+ntTriv = colnames(d)[7:11]
+ntEff = colnames(d)[13:17]
+```
+
+```{r noiseTypes, eval=T}
+
+
+# compute mean and sd
+ntDf = data.frame(cbind(
+  nts=1:length(nts),
+  meanEff=apply(d[, ntEff], FUN = mean, MARGIN = 2),
+  sdEff=apply(d[, ntEff], FUN = sd, MARGIN = 2),
+  meanTriv=apply(d[, ntTriv], FUN = mean, MARGIN = 2),
+  sdTriv=apply(d[, ntTriv], FUN = sd, MARGIN = 2)
+))
+
+# compute mean and sd weighted
+ntDfW = data.frame(cbind(
+  nts=1:length(nts),
+  meanEff=apply(d[, ntEff]*(d$spmEff/5), FUN = mean, MARGIN = 2),
+  sdEff=apply(d[, ntEff]*(d$spmEff/5), FUN = sd, MARGIN = 2),
+  meanTriv=apply(d[, ntTriv]*(d$spmEff/5), FUN = mean, MARGIN = 2),
+  sdTriv=apply(d[, ntTriv]*(d$spmEff/5), FUN = sd, MARGIN = 2)
+))
+
+# Plot not weighted
+ntDf_maxMean = max(ntDf[,c('meanEff','meanTriv')])
+ntDf_maxSD = max(ntDf[,c('sdEff','sdTriv')])
+
+ntDfLong <- ntDf |> 
+  pivot_longer(cols = -nts,names_to = "Type") |>
+  mutate(scaled_value=ifelse(
+    Type %in% c('meanEff','meanTriv'),
+    value,
+    value/ntDf_maxSD*ntDf_maxMean))
+
+
+# Plot Weighted
+ntDfW_maxMean = max(ntDfW[,c('meanEff','meanTriv')])
+ntDfW_maxSD = max(ntDfW[,c('sdEff','sdTriv')])
+
+ntDfWLong <- ntDfW |> 
+  pivot_longer(cols = -nts,names_to = "Type") |>
+  mutate(scaled_value=ifelse(
+    Type %in% c('meanEff','meanTriv'),
+    value,
+    value/ntDfW_maxSD*ntDfW_maxMean))
+
+ggplot(ntDfWLong, aes(x=nts, y = scaled_value,fill= Type)) +
+  geom_col(position="dodge") +
+  scale_y_continuous(sec.axis = sec_axis(~ . /ntDf_maxMean*ntDf_maxSD , name = "Standardavvik"))+
+  scale_fill_manual(
+    values = c('#59f7ea', '#be77f9', "#ccfcf9", '#dbbcf5'),
+    labels = c('Effektivitet', 'Trivsel', 'SD Effektivitet', 'SD Trivsel')
+  ) +
+  labs(y="P\u00E5virkning", x="St\u00F8ytype") +
+  scale_x_discrete(limit = nts)+
+  theme_minimal() +
+  theme(legend.title = element_blank())
+
+```
+
+```{r saveNoiseTypes, eval=F, include=F}
+pdf(file = './figures/noiseTypeBar.pdf', width = 6,height = 6)
+ggplot(ntDfLong,aes(x=nts, y = scaled_value,fill= Type)) + 
+  geom_col(position="dodge") + 
+  scale_y_continuous(sec.axis = sec_axis(~ . /ntDf_maxMean*ntDf_maxSD , name = "Standardavvik"))+
+  scale_fill_manual(
+    values = c('#59f7ea', '#be77f9', "#ccfcf9", '#dbbcf5'),
+    labels = c('Effektivitet', 'Trivsel', 'SD Effektivitet', 'SD Trivsel')
+  )+
+  labs(y="P\u00E5virkning", x="St\u00F8ytype") + 
+  scale_x_discrete(limit = nts)+
+  theme_minimal() + 
+  theme(legend.title = element_blank())
+dev.off()
+```
+
+```{r removed, include=FALSE, eval=FALSE}
+
+# æ is \u00E6
+# ø is \u00F8
+# å is \u00E5
+# ggplot(ntDfLong,aes(x=nts, y = scaled_value,fill= Type)) + 
+#   geom_col(position="dodge") + 
+#   scale_y_continuous(sec.axis = sec_axis(~ . /ntDf_maxMean*ntDf_maxSD , name = "Standardavvik"))+
+#   scale_fill_manual(
+#     values = c('#59f7ea', '#be77f9', "#ccfcf9", '#dbbcf5'),
+#     labels = c('Effektivitet', 'Trivsel', 'SD Effektivitet', 'SD Trivsel')
+#   ) +
+#   labs(y="P\u00E5virkning", x="St\u00F8ytype") + 
+#   scale_x_discrete(limit = nts)+
+#   theme_minimal() + 
+#   theme(legend.title = element_blank())
+
+# With conf int bars
+# ntDfMean = ntDf[, c('nts','meanEff', 'meanTriv')]
+# ntDfSd = ntDf[, c('nts','sdEff', 'sdTriv')]
+# ntDfMeanLong <- ntDfMean |> 
+#   pivot_longer(cols = -nts,names_to = "Type")
+# ntDfSdLong <- ntDfSd |> 
+#   pivot_longer(cols = -nts,names_to = "Type")
+# ntDfMeanLong$sd = ntDfSdLong$value
+
+# ggplot(ntDfMeanLong, aes(x=nts, y = value,fill= Type)) + 
+#   geom_col(position="dodge") + 
+#   # scale_y_continuous(sec.axis = sec_axis(~ . /ntDf_maxMean*ntDf_maxSD , name = "Standardavvik"))+
+#   scale_fill_manual(
+#     values = c('#59f7ea', '#be77f9'),
+#     labels = c('Effektivitet', 'Trivsel')
+#   )+
+#   geom_errorbar(
+#     aes(
+#       # x=nts,
+#       ymin = value - 1.96*sd,
+#       ymax = value + 1.96*sd),
+#       color = "black",
+#     position=position_dodge(.9),
+#     width=.2
+#   ) +
+#   # facet_grid(cols = vars(Type))+
+#   labs(y="P\u00E5virkning", x="St\u00F8ytype") + 
+#   scale_x_discrete(limit = nts)+
+#   theme_minimal() + 
+#   theme(legend.title = element_blank())
+```
+
+# Noise types with confidence intervals
+```{r ntConfInt, options}
+# Compute mean and confidence intervals
+ntDfCi = data.frame(
+  cbind(
+    nts=1:length(nts),
+    t(apply(d[,ntEff], FUN = CI, MARGIN=2)),
+    t(apply(d[,ntTriv], FUN = CI, MARGIN=2))
+    )
+)
+
+# colnames(ntDfCi)
+meansTemp = c('nts','mean','mean.1')
+upperTemp = c('nts','upper','upper.1')
+lowerTemp = c('nts','lower','lower.1')
+dfMTemp = ntDfCi[,meansTemp]
+dfUTemp = ntDfCi[,upperTemp]
+dfLTemp = ntDfCi[,lowerTemp]
+
+ntDfCiLong <- dfMTemp|>
+  pivot_longer(cols=-nts, names_to='Type')
+ntDfULong = dfUTemp |>
+  pivot_longer(cols=-nts, names_to='Type')
+ntDfLLong = dfLTemp |>
+  pivot_longer(cols=-nts, names_to='Type')
+
+ntDfCiLong$upper=ntDfULong$value
+ntDfCiLong$lower=ntDfLLong$value
+
+ntDfCiLong$nts=nts[ntDfCiLong$nts]
+# rep(c('eff','triv'), as.integer(length(nts)))
+ntDfCiLong$Type=rep(c('eff','triv'), as.integer(length(nts)))
+colnames(ntDfCiLong) = c('nts', 'Type', 'mean', 'upper', 'lower')
+
+ggplot(ntDfCiLong, aes(x=nts, y = mean ,fill= Type)) + 
+  geom_col(position="dodge") + 
+  # scale_y_continuous(sec.axis = sec_axis(~ . /ntDf_maxMean*ntDf_maxSD , name = "Standardavvik"))+
+  scale_fill_manual(
+    values = c('darkblue', 'lightblue'),
+    labels = c('Effektivitet', 'Trivsel')
+  )+
+  geom_errorbar(
+    aes(
+      # x=nts,
+      ymin = lower,
+      ymax = upper),
+      color = "black",
+    position=position_dodge(.9),
+    width=.4
+  ) +
+  # facet_grid(cols = vars(Type))+
+  labs(y="P\u00E5virkning", x="St\u00F8ytype") + 
+  scale_x_discrete(limit = nts)+
+  theme_minimal() + 
+  theme(legend.title = element_blank())
+```
+
+```{r saveNTconfInt, eval=F, include=F}
+pdf(file = './figures/noiseTypeBarConfInt.pdf', width = 6,height = 4)
+ggplot(ntDfCiLong, aes(x=nts, y = mean ,fill= Type)) + 
+  geom_col(position="dodge") + 
+  # scale_y_continuous(sec.axis = sec_axis(~ . /ntDf_maxMean*ntDf_maxSD , name = "Standardavvik"))+
+  scale_fill_manual(
+    values = c('darkblue', 'lightblue'),
+    labels = c('Effektivitet', 'Trivsel')
+  )+
+  geom_errorbar(
+    aes(
+      # x=nts,
+      ymin = lower,
+      ymax = upper),
+      color = "black",
+    position=position_dodge(.9),
+    width=.4
+  ) +
+  # facet_grid(cols = vars(Type))+
+  labs(y="P\u00E5virkning", x="St\u00F8ytype") + 
+  scale_x_discrete(limit = nts)+
+  theme_minimal() + 
+  theme(legend.title = element_blank())
+dev.off()
+```
+
+```{r verificationNTconfInt, include=F,eval=F}
+hist(d$byggestoy1)
+CI(d$byggestoy1)
+sd(d$byggestoy1)
+mean(d$byggestoy1)
+mean(d$byggestoy1) + 1.96*sd(d$byggestoy1)/sqrt(143)
+```
+
+## NT Count (Discarded)
+```{r ntCount, options}
+valueCount = function(x){
+  return(c(sum(x==1), sum(x==2), sum(x==3), sum(x==4), sum(x==5)))
+}
+
+ntCount = data.frame(
+  cbind(
+    score=1:length(nts),
+    apply(d[,ntTriv], 2, FUN=valueCount)
+    )
+)
+
+ntCountLong <- ntCount|>
+  pivot_longer(cols=-score, names_to='Type')
+
+ggplot(ntCountLong, aes(x=score, y = value ,fill= Type)) + 
+  geom_col(position="dodge") + 
+  # scale_y_continuous(sec.axis = sec_axis(~ . /ntDf_maxMean*ntDf_maxSD , name = "Standardavvik"))+
+  # scale_fill_manual(
+  #   values = c('darkblue', 'lightblue'),
+  #   labels = c('Effektivitet', 'Trivsel')
+  # )+
+  # facet_grid(cols = vars(Type))+
+  labs(y="Antall", x="Svar") + 
+  # scale_x_discrete(limit = nts)+
+  theme_minimal() + 
+  theme(legend.title = element_blank())
+
+nTemp = length(d[,'personstoy1'])
+CI(d[,'personstoy1'])
+mTemp = mean(d[,'personstoy1'])
+sTemp = sd(d[,'personstoy1'])
+mTemp + qt(0.975,nTemp)*(sTemp/sqrt(nTemp))
+```
+
+
+# Kjel and Varme
+Combine `kjel` and `varme` because of struggle with polygons in "building colored" map.
+```{r kjelVarme, options}
+nKjel = length(d[d$spmHvor=='kjel',1])
+nVarme = length(d[d$spmHvor=='varme',1])
+nKV = nKjel + nVarme
+vkTriv = c(
+  d[d$spmHvor=='kjel','spmTriv'],
+  d[d$spmHvor=='varme','spmTriv']
+)
+vkEff = c(
+  d[d$spmHvor=='kjel','spmEff'],
+  d[d$spmHvor=='varme','spmEff']
+)
+mTriv = mean(vkTriv)
+mEff = mean(vkEff)
+sdTriv = sd(vkTriv)
+sdEff = sd(vkEff)
+kjVarme = cbind(mTriv,mEff,sdTriv,sdEff)
+colnames(kjVarme) = c('meanTriv', 'meanEff', 'sdTriv', 'sdEff')
+round(kjVarme,2)
+```
+
+
+# ANC and noise type correlation
+We will look at noise types and how much they disturb when the individual uses ANC compared to when the individual is not.
+```{r ANCNoisetype, options}
+# ntTriv = colnames(d)[7:11]
+# ntEff = colnames(d)[13:17]
+ntColnames = c(
+  'Konstruksjon', 'Person', 'Trafikk', 'Vifte', 'Annet')
+ntRownames = c(
+  'Trivsel m/ ANC', 'Trivsel u/ ANC', 'Effektivitet m/ ANC',
+  'Effektivitet u/ ANC')
+ntAnc = data.frame(
+  matrix(
+    ncol = length(ntTriv), nrow = 4,
+    dimnames=list(ntRownames, ntColnames)
+  )
+)
+ntAncSD = data.frame(
+  matrix(
+    ncol = length(ntTriv), nrow = 4,
+    dimnames=list(ntRownames, ntColnames)
+  )
+)
+
+# Find mean noise type disturbances
+ancBool = d[,"spmTiltak_1"] == "mNc"
+ntAnc[ntColnames] = rbind(
+  apply(d[ancBool, ntTriv], FUN = mean, MARGIN = 2),
+  apply(d[!ancBool, ntTriv], FUN = mean, MARGIN = 2),
+  apply(d[ancBool,ntEff], FUN = mean, MARGIN = 2),
+  apply(d[!ancBool,ntEff], FUN = mean, MARGIN = 2)
+)
+ntAncSD[ntColnames] = rbind(
+  apply(d[ancBool, ntTriv], FUN = sd, MARGIN = 2),
+  apply(d[!ancBool, ntTriv], FUN = sd, MARGIN = 2),
+  apply(d[ancBool,ntEff], FUN = sd, MARGIN = 2),
+  apply(d[!ancBool,ntEff], FUN = sd, MARGIN = 2)
+)
+
+# Barplot
+reOrder = c(1,3,2,4)
+cols = c("#b1fbf5", '#d5a7fb', '#59f7ea', '#be77f9')
+
+# Mean
+barplot(
+  ((as.matrix(ntAnc[reOrder,]))), 
+  col = cols[reOrder],
+  border = "white",
+  # main="Trivsel",
+  ylab="P\u00E5virkning",
+  beside = T,
+  # las=2,
+  ylim = c(0,5)
+  # space=0.1
+)
+legend(
+  "top",
+  legend = ntRownames[reOrder],
+  fill = cols[reOrder], bty = 'n')
+
+# SD
+ntAncSDrange = max(ntAncSD)
+barplot(
+  ((as.matrix(ntAncSD[reOrder,]))), 
+  col = cols[reOrder],
+  border = "white",
+  # main="Trivsel",
+  ylab="Standardavvik",
+  beside = T,
+  # las=2,
+  ylim = c(0,ntAncSDrange*(1+0.3))
+  # space=0.1
+)
+legend(
+  "top",
+  legend = ntRownames[reOrder],
+  fill = cols[reOrder], bty = 'n')
+```
+
+```{r saveANCnoiseType, eval=F, include=F}
+par(mar=defaultMar-c(0,0,1,0))
+
+# Mean
+pdf(file = './figures/histANCnoiseType.pdf', width = 6,height = 6)
+barplot(
+  ((as.matrix(ntAnc[reOrder,]))), 
+  col = cols[reOrder],
+  border = "white",
+  # main="Trivsel",
+  ylab="P\u00E5virkning",
+  beside = T,
+  # las=2,
+  ylim = c(0,5)
+  # space=0.1
+)
+legend(
+  "top",
+  legend = ntRownames[reOrder],
+  fill = cols[reOrder], bty = 'n')
+dev.off()
+
+# SD
+pdf(file = './figures/histANCnoiseTypeSD.pdf', width = 6,height = 6)
+barplot(
+  ((as.matrix(ntAncSD[reOrder,]))), 
+  col = cols[reOrder],
+  border = "white",
+  # main="Trivsel",
+  ylab="Standardavvik",
+  beside = T,
+  # las=2,
+  ylim = c(0,ntAncSDrange*(1+0.3))
+  # space=0.1
+)
+legend(
+  "top",
+  legend = ntRownames[reOrder],
+  fill = cols[reOrder], bty = 'n')
+dev.off()
+
+par(mar=defaultMar)
+```
+
+# LME models
+Here we look at the nested linear mixed models explained in the theory of the report.
+```{r LMEsetup, options}
+# Setup
+trivNames = names(d)[6:11]
+effNames = names(d)[12:17]
+tiltakNames = names(d)[18:24]
+dt = d[,c(trivNames, tiltakNames, 'spmHvor')]
+de = d[,c(effNames, tiltakNames, 'spmHvor')]
+
+tiltakBool = function(x){
+  # Function for random effects
+  return(x!="")
+}
+```
+
+## Model selection
+First we fit the models.
+```{r lmeFit, options}
+# Trivsel ###################################
+# Complex model
+totMod_Triv = lmer(
+  spmTriv ~ -1 + byggestoy1 + personstoy1 + trafikk1 + vifte1 + annet1 + as.factor(spmHvor)
+   + (1|spmTiltak_1) + (1|spmTiltak_2) + (1|spmTiltak_3) + (1|spmTiltak_4)
+  + (1|spmTiltak_5) + (1|spmTiltak_6) + (1|spmTiltak_7)
+  ,data = dt)
+
+# without tiltak
+ntWhereMod_Triv = lm(
+  spmTriv ~ -1 + byggestoy1 + personstoy1 + trafikk1 + vifte1 + annet1 + as.factor(spmHvor)
+  ,data = dt)
+
+
+# Only noise types
+ntMod_Triv = lm(
+  spmTriv ~ -1 + byggestoy1 + personstoy1 + trafikk1 + vifte1 + annet1
+  ,data = dt)
+
+# Additional model with only location as explanatory variable
+whereMod_Triv = lm(spmTriv ~ as.factor(spmHvor), data=dt)
+
+
+# Effektivitet ############################
+# Complex model
+totMod_Eff = lmer(
+  spmEff ~ -1 + byggestoy2 + personstoy2 + trafikk2+ vifte2 + annet2 + as.factor(spmHvor)
+   + (1|spmTiltak_1) + (1|spmTiltak_2) + (1|spmTiltak_3) + (1|spmTiltak_4)
+  + (1|spmTiltak_5) + (1|spmTiltak_6) + (1|spmTiltak_7)
+  ,data = de)
+
+# Without tiltak
+ntWhereMod_Eff = lm(
+  spmEff ~ -1 + byggestoy2 + personstoy2 + trafikk2 + vifte2 + annet2 + as.factor(spmHvor)
+  ,data = de)
+
+# Only noise type
+ntMod_Eff = lm(
+  spmEff ~ -1 + byggestoy2 + personstoy2 + trafikk2 + vifte2 + annet2
+  ,data = de)
+
+# Additional model with only location as explanatory variable
+whereMod_Eff = lm(spmEff ~ as.factor(spmHvor), data=de)
+```
+
+Then we make model selection using `anova`. 
+```{r modSel, options}
+# Trivsel
+anova(totMod_Triv, ntWhereMod_Triv, ntMod_Triv, test='LRT') # In report
+# Effektivitet
+anova(totMod_Eff, ntWhereMod_Eff, ntMod_Eff, test='LRT')
+```
+
+```{r removed1, include=F, eval=F}
+# anova(whereMod_Triv, ntWhereMod_Triv, test="Chisq")
+# anova(ntWhereMod_Triv, ntMod_Triv, test='LRT')
+# anova(ntWhereMod_Triv, ntMod_Triv, test='Chisq')
+
+# anova(whereMod_Eff, ntWhereMod_Eff, test="Chisq")
+
+# summary(totMod_Triv)
+# summary(whereMod_Triv)
+# summary(whereMod_Eff)
+```
+
+## Model summaries trivsel
+We skip showing the summaries of nested models without significant $\chi^2$ on level $\alpha=0.1$. That is, we skip the total model for `Triv`.  
+```{r lmeSummaries, options}
+# Trivsel
+summary(ntMod_Triv)
+summary(ntWhereMod_Triv)
+
+# Effektivitet
+summary(ntMod_Eff)
+summary(ntWhereMod_Eff)
+```
+
+# Misc requests
+These are some statistics requested by team members.
+
+## Anc data (old)
+```{r anc, options}
+N = length(d[,1])
+ancPercentage = length(d$spmTiltak_1[d$spmTiltak_1=='mNc']) / N
+ancPercentage
+```
+
+## Noise Type in Elektro (Sindre)
+Closely consider the distribution of noise type answers on the scale 1-5 and each noise type mean and CI for location `elektro`.
+```{r elektroNTdistr, options}
+elektro = c("elD","elB","elE","elA")
+elTriv = d[d$spmHvor %in% elektro, c('spmHvor', ntTriv)]
+elEff = d[d$spmHvor %in% elektro, c('spmHvor', ntEff)]
+
+elLong <- elTriv |> pivot_longer(cols = -spmHvor, names_to = "nt", values_to = 'triv')
+elEffLong = elEff |> pivot_longer(cols = -spmHvor, names_to = "nt", values_to = 'eff')
+elLong$eff = elEffLong$eff
+
+# Plot
+plotColors = colorRampPalette(c("lightblue", 'purple4'))(5)
+ggElektroTriv = ggplot(data=elLong, aes(x=triv, fill=nt)) +
+  geom_bar(position = 'dodge')+
+  scale_fill_manual(
+    values = plotColors,
+    labels = c('Annet', 'Konstruksjon', 'personst\U00F8y', 'trafikk', 'vifte')
+  ) +
+  labs(x="P\u00E5virkning", y="Antall svar")+
+  scale_y_continuous(breaks = seq(0,20,10)) +
+  theme_minimal() +
+  theme(panel.grid.major.x = element_blank(), legend.title = element_blank())
+ggElektroTriv
+
+ggElektroEff = ggplot(data=elLong, aes(x=eff, fill=nt)) +
+  geom_bar(position = 'dodge')+
+  scale_fill_manual(
+    values = plotColors,
+    labels = c('Annet', 'Konstruksjon', 'personst\U00F8y', 'trafikk', 'vifte')
+  ) +
+  labs(x="P\u00E5virkning", y="Antall svar")+
+  theme_minimal() +
+  theme(panel.grid.major.x = element_blank(), legend.title = element_blank())
+ggElektroEff
+
+# ggplot(data=elLong, aes(x=nt))+
+#   geom_bar(position="dodge", aes(y = triv), stat='summary', fun='mean') +
+#   geom_bar(aes(y = eff), stat='summary', fun='mean') 
+```
+
+```{r saveElektroNTDistr, include=FALSE, eval=FALSE}
+pdf(file = './figures/noiseTypeDistrElektroTriv.pdf', width = 5,height = 3)
+ggElektroTriv
+dev.off()
+
+pdf(file = './figures/noiseTypeDistrElektroEff.pdf', width = 5,height = 3)
+ggElektroEff
+dev.off()
+
+# ggElektroTrivNoLegend = ggElektroTriv
+# ggElektroTrivNoLegend + guides(fill = FALSE)
+pdf(file = './figures/noiseTypeDistrElektroTrivNoLegend.pdf', width = 4,height = 3)
+ggElektroTriv + guides(fill = FALSE)
+dev.off()
+```
+
+
+
+```{r ntElektroMean, options}
+elData = data.frame(
+  cbind(
+    nts=1:length(nts),
+    t(apply(d[d$spmHvor %in% elektro, ntEff], FUN = CI, MARGIN=2)),
+    t(apply(d[d$spmHvor %in% elektro, ntTriv], FUN = CI, MARGIN=2))
+    )
+)
+
+meansTemp = c('nts','mean','mean.1')
+upperTemp = c('nts','upper','upper.1')
+lowerTemp = c('nts','lower','lower.1')
+dfMTemp = elData[,meansTemp]
+dfUTemp = elData[,upperTemp]
+dfLTemp = elData[,lowerTemp]
+
+ntDfCiLong <- dfMTemp|>
+  pivot_longer(cols=-nts, names_to='Type')
+ntDfULong = dfUTemp |>
+  pivot_longer(cols=-nts, names_to='Type')
+ntDfLLong = dfLTemp |>
+  pivot_longer(cols=-nts, names_to='Type')
+
+ntDfCiLong$upper=ntDfULong$value
+ntDfCiLong$lower=ntDfLLong$value
+
+ntDfCiLong$nts=nts[ntDfCiLong$nts]
+ntDfCiLong$Type=rep(c('eff','triv'), as.integer(length(nts)))
+colnames(ntDfCiLong) = c('nts', 'Type', 'mean', 'upper', 'lower')
+
+ggElektro = ggplot(ntDfCiLong, aes(x=nts, y = mean ,fill= Type)) + 
+  geom_col(position="dodge") + 
+  scale_fill_manual(
+    values = c('darkblue', 'lightblue'),
+    labels = c('Effektivitet', 'Trivsel')
+  )+
+  geom_errorbar(
+    aes(
+      # x=nts,
+      ymin = lower,
+      ymax = upper),
+      color = "black",
+    position=position_dodge(.9),
+    width=.4
+  ) +
+  labs(y="P\u00E5virkning", x="St\u00F8ytype") + 
+  scale_x_discrete(limit = nts)+
+  theme_minimal() + 
+  theme(legend.title = element_blank())
+ggElektro
+```
+
+```{r saveNTelektro, options}
+pdf(file = './figures/noiseTypeBarConfIntElektro.pdf', width = 6,height = 4)
+ggElektro
+dev.off()
+```
+
+
+
